@@ -1,0 +1,73 @@
+name: Broadcast Scheduler (Test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Batch size per request (recommended 20-30)'
+        required: true
+        default: '25'
+        type: choice
+        options:
+          - '20'
+          - '25'
+          - '30'
+
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - name: Get total user count from Supabase
+        id: get_total
+        run: |
+          TOTAL_USERS=$(curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/bot_users?select=count" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            | jq '.[0].count // 0')
+          echo "total_users=$TOTAL_USERS" >> $GITHUB_OUTPUT
+          echo "Total users: $TOTAL_USERS"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+      - name: Send broadcast in batches
+        if: steps.get_total.outputs.total_users > 0
+        run: |
+          TOTAL_USERS=${{ steps.get_total.outputs.total_users }}
+          BATCH_SIZE=${{ github.event.inputs.batch_size || 25 }}
+          TOTAL_BATCHES=$(( (TOTAL_USERS + BATCH_SIZE - 1) / BATCH_SIZE ))
+
+          echo "Total: $TOTAL_USERS, Batch size: $BATCH_SIZE, Batches: $TOTAL_BATCHES"
+          echo ""
+
+          for ((i=0; i<TOTAL_BATCHES; i++)); do
+            START_INDEX=$((i * BATCH_SIZE))
+            END_INDEX=$((START_INDEX + BATCH_SIZE))
+            if [ $END_INDEX -gt $TOTAL_USERS ]; then
+              END_INDEX=$TOTAL_USERS
+            fi
+
+            echo "Batch $((i+1))/$TOTAL_BATCHES (users $START_INDEX - $END_INDEX)"
+
+            RESPONSE=$(curl -s -X POST "${{ secrets.WORKER_URL }}/broadcast_batch" \
+              -H "Content-Type: application/json" \
+              -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE}")
+
+            echo "Response: $RESPONSE"
+
+            # Wait 1 second between batches to avoid Telegram rate limits
+            sleep 1
+          done
+
+          echo "Broadcast completed!"
+
+      - name: Notify admin on completion
+        if: always()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${{ secrets.ADMIN_CHAT_ID }}\",\"text\":\" Broadcast task completed via GitHub Actions.\"}"
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
