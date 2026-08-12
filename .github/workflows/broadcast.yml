@@ -3,8 +3,18 @@ name: Broadcast Scheduler (Test)
 on:
   workflow_dispatch:
     inputs:
+      message_en:
+        description: 'English message'
+        required: true
+        default: '📢 PG Bot Broadcast'
+        type: string
+      message_am:
+        description: 'Amharic message'
+        required: false
+        default: '📢 የፒጂ ቦት ማስታወቂያ'
+        type: string
       batch_size:
-        description: 'Batch size per request (recommended 20-30)'
+        description: 'Batch size (20-30)'
         required: true
         default: '25'
         type: choice
