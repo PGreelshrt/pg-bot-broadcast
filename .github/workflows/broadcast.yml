@@ -63,7 +63,7 @@ jobs:
 
             RESPONSE=$(curl -s -X POST "${{ secrets.WORKER_URL }}/broadcast_batch" \
               -H "Content-Type: application/json" \
-              -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE}")
+              -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE,\"messageEn\":\"${{ github.event.inputs.message_en }}\",\"messageAm\":\"${{ github.event.inputs.message_am }}\"}")
 
             echo "Response: $RESPONSE"
 
