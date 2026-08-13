@@ -32,10 +32,13 @@ jobs:
       - name: Get total user count
         id: get_total
         run: |
-          TOTAL_USERS=$(curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/bot_users?select=count" \
+          # 使用更可靠的查询方式：获取所有用户的 id，然后计算数组长度
+          RESPONSE=$(curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/bot_users?select=id" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-            | jq '.[0].count // 0')
+            -H "Content-Type: application/json")
+          echo "Response: $RESPONSE"
+          TOTAL_USERS=$(echo "$RESPONSE" | jq 'length')
           echo "total_users=$TOTAL_USERS" >> $GITHUB_OUTPUT
           echo "Total users: $TOTAL_USERS"
         env:
@@ -49,7 +52,7 @@ jobs:
           BATCH_SIZE=${{ github.event.inputs.batch_size || 25 }}
           TOTAL_BATCHES=$(( (TOTAL_USERS + BATCH_SIZE - 1) / BATCH_SIZE ))
 
-          # ✅ 终极清理：去除所有不可见字符、换行、回车、空格
+          # 清理 WORKER_URL
           WORKER_URL_RAW="${{ secrets.WORKER_URL }}"
           WORKER_URL=$(echo "$WORKER_URL_RAW" | tr -d '\r\n\t ' | sed 's:/*$::')
 
@@ -66,7 +69,6 @@ jobs:
 
             echo "Batch $((i+1))/$TOTAL_BATCHES ($START_INDEX - $END_INDEX)"
 
-            # ✅ 显式拼接完整 URL，确保路径正确
             FULL_URL="${WORKER_URL}/broadcast_batch"
             echo "Request URL: $FULL_URL"
 
