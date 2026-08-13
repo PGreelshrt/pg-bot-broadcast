@@ -49,11 +49,11 @@ jobs:
           BATCH_SIZE=${{ github.event.inputs.batch_size || 25 }}
           TOTAL_BATCHES=$(( (TOTAL_USERS + BATCH_SIZE - 1) / BATCH_SIZE ))
 
-          # 关键修复：去除 WORKER_URL 中的换行/回车符，并去掉尾部斜杠
-          WORKER_URL=$(echo "${{ secrets.WORKER_URL }}" | tr -d '\r\n')
-          WORKER_URL="${WORKER_URL%/}"
+          # ✅ 终极清理：去除所有不可见字符、换行、回车、空格
+          WORKER_URL_RAW="${{ secrets.WORKER_URL }}"
+          WORKER_URL=$(echo "$WORKER_URL_RAW" | tr -d '\r\n\t ' | sed 's:/*$::')
 
-          echo "Worker URL: $WORKER_URL"
+          echo "Worker URL (cleaned): $WORKER_URL"
           echo "Total: $TOTAL_USERS, Batch: $BATCH_SIZE, Batches: $TOTAL_BATCHES"
           echo ""
 
@@ -66,7 +66,11 @@ jobs:
 
             echo "Batch $((i+1))/$TOTAL_BATCHES ($START_INDEX - $END_INDEX)"
 
-            RESPONSE=$(curl -s -X POST "${WORKER_URL}/broadcast_batch" \
+            # ✅ 显式拼接完整 URL，确保路径正确
+            FULL_URL="${WORKER_URL}/broadcast_batch"
+            echo "Request URL: $FULL_URL"
+
+            RESPONSE=$(curl -s -X POST "$FULL_URL" \
               -H "Content-Type: application/json" \
               -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE,\"messageEn\":\"${{ github.event.inputs.message_en }}\",\"messageAm\":\"${{ github.event.inputs.message_am }}\"}")
 
