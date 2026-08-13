@@ -49,6 +49,11 @@ jobs:
           BATCH_SIZE=${{ github.event.inputs.batch_size || 25 }}
           TOTAL_BATCHES=$(( (TOTAL_USERS + BATCH_SIZE - 1) / BATCH_SIZE ))
 
+          # 关键修复：去除 WORKER_URL 中的换行/回车符，并去掉尾部斜杠
+          WORKER_URL=$(echo "${{ secrets.WORKER_URL }}" | tr -d '\r\n')
+          WORKER_URL="${WORKER_URL%/}"
+
+          echo "Worker URL: $WORKER_URL"
           echo "Total: $TOTAL_USERS, Batch: $BATCH_SIZE, Batches: $TOTAL_BATCHES"
           echo ""
 
@@ -61,7 +66,7 @@ jobs:
 
             echo "Batch $((i+1))/$TOTAL_BATCHES ($START_INDEX - $END_INDEX)"
 
-            RESPONSE=$(curl -s -X POST "${{ secrets.WORKER_URL }}/broadcast_batch" \
+            RESPONSE=$(curl -s -X POST "${WORKER_URL}/broadcast_batch" \
               -H "Content-Type: application/json" \
               -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE,\"messageEn\":\"${{ github.event.inputs.message_en }}\",\"messageAm\":\"${{ github.event.inputs.message_am }}\"}")
 
