@@ -1,92 +1,31 @@
-name: Broadcast Scheduler
+name: Telegram Telegram Broadcast Engine
 
 on:
-  workflow_dispatch:
-    inputs:
-      message_en:
-        description: 'English message'
-        required: true
-        default: '📢 PG Bot Broadcast'
-        type: string
-      message_am:
-        description: 'Amharic message (optional)'
-        required: false
-        default: ''
-        type: string
-      batch_size:
-        description: 'Batch size per request (20-30)'
-        required: true
-        default: '25'
-        type: choice
-        options:
-          - '20'
-          - '25'
-          - '30'
+  repository_dispatch:
+    types: [tg_broadcast]
 
 jobs:
   broadcast:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
-
     steps:
-      - name: Get total user count
-        id: get_total
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-with: 20
+
+      - name: Install Dependencies
         run: |
-          # 使用更可靠的查询方式：获取所有用户的 id，然后计算数组长度
-          RESPONSE=$(curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/bot_users?select=id" \
-            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-            -H "Content-Type: application/json")
-          echo "Response: $RESPONSE"
-          TOTAL_USERS=$(echo "$RESPONSE" | jq 'length')
-          echo "total_users=$TOTAL_USERS" >> $GITHUB_OUTPUT
-          echo "Total users: $TOTAL_USERS"
+          npm init -y
+          npm install @supabase/supabase-js node-fetch
+
+      - name: Run Broadcast Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-
-      - name: Send broadcast in batches
-        if: steps.get_total.outputs.total_users > 0
-        run: |
-          TOTAL_USERS=${{ steps.get_total.outputs.total_users }}
-          BATCH_SIZE=${{ github.event.inputs.batch_size || 25 }}
-          TOTAL_BATCHES=$(( (TOTAL_USERS + BATCH_SIZE - 1) / BATCH_SIZE ))
-
-          # 清理 WORKER_URL
-          WORKER_URL_RAW="${{ secrets.WORKER_URL }}"
-          WORKER_URL=$(echo "$WORKER_URL_RAW" | tr -d '\r\n\t ' | sed 's:/*$::')
-
-          echo "Worker URL (cleaned): $WORKER_URL"
-          echo "Total: $TOTAL_USERS, Batch: $BATCH_SIZE, Batches: $TOTAL_BATCHES"
-          echo ""
-
-          for ((i=0; i<TOTAL_BATCHES; i++)); do
-            START_INDEX=$((i * BATCH_SIZE))
-            END_INDEX=$((START_INDEX + BATCH_SIZE))
-            if [ $END_INDEX -gt $TOTAL_USERS ]; then
-              END_INDEX=$TOTAL_USERS
-            fi
-
-            echo "Batch $((i+1))/$TOTAL_BATCHES ($START_INDEX - $END_INDEX)"
-
-            FULL_URL="${WORKER_URL}/broadcast_batch"
-            echo "Request URL: $FULL_URL"
-
-            RESPONSE=$(curl -s -X POST "$FULL_URL" \
-              -H "Content-Type: application/json" \
-              -d "{\"startIndex\":$START_INDEX,\"endIndex\":$END_INDEX,\"batchSize\":$BATCH_SIZE,\"messageEn\":\"${{ github.event.inputs.message_en }}\",\"messageAm\":\"${{ github.event.inputs.message_am }}\"}")
-
-            echo "Response: $RESPONSE"
-            sleep 1
-          done
-
-          echo "Broadcast completed!"
-
-      - name: Notify admin
-        if: always()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_TOKEN }}/sendMessage" \
-            -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"${{ secrets.ADMIN_CHAT_ID }}\",\"text\":\"✅ GitHub Actions Broadcast mission complete!\"}"
-        env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          # 接收来自 Cloudflare 传递的 Payload 变量
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: node broadcast.js
