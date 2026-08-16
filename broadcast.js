@@ -1,20 +1,20 @@
 const { createClient } = require('@supabase/supabase-js');
-const fetch = require('node-fetch');
 
-// 1. 初始化环境变量
+// 1. 初始化环境变量 (Node 24 全面原生支持 fetch，直接剔除 node-fetch)
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const payload = JSON.parse(process.env.CLIENT_PAYLOAD);
 const TG_TOKEN = process.env.TELEGRAM_TOKEN;
 
 const { admin_id, progress_message_id, en_message, am_message } = payload;
 
-// 辅助函数：延迟执行（用于控频）
+// 辅助函数：延迟执行（用于严格控频）
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // 辅助函数：更新管理员的进度消息
 async function updateProgress(text) {
   if (!progress_message_id) return;
   try {
+    // 采用 Node 24 全新原生全局 fetch 发送
     await fetch(`https://telegram.org{TG_TOKEN}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,7 +33,6 @@ async function updateProgress(text) {
 async function startBroadcast() {
   console.log("广播开始初始化...");
   
-  // 2. 从 Supabase 分批拉取用户（防止用户量过大单次内存溢出）
   let page = 0;
   const pageSize = 500;
   let hasMore = true;
@@ -43,10 +42,12 @@ async function startBroadcast() {
   let totalProcessed = 0;
 
   while (hasMore) {
+    // 让 Supabase 在服务端直接按 chat_id 升序
     const { data: users, error } = await supabase
       .from('bot_users')
-      .select('chat_id, lang')
-      .range(page * pageSize, (page + 1) * pageSize - 1);
+      .select('chat_id, lang, is_blocked')
+      .range(page * pageSize, (page + 1) * pageSize - 1)
+      .order('chat_id', { ascending: true });
 
     if (error) {
       console.error("读取 Supabase 出错:", error);
@@ -59,16 +60,21 @@ async function startBroadcast() {
       break;
     }
 
-    // 3. 循环发送消息
+    // 循环发送消息
     for (const user of users) {
       if (!user.chat_id) continue;
       
-      // 决定发送给该用户的文本（默认发送 AM）
+      // 黑名单拦截
+      if (user.is_blocked === true || user.is_blocked === 'true') {
+        console.log(`跳过被拉黑的用户: ${user.chat_id}`);
+        continue; 
+      }
+      
+      // 语言清洗（默认发送 AM）
       let targetMessage = am_message; 
       if (user.lang && user.lang.toLowerCase() === 'en' && en_message) {
         targetMessage = en_message;
       } else if (!targetMessage) {
-        // 如果该语言内容为空，则降级选择另一种
         targetMessage = en_message || am_message; 
       }
 
@@ -96,7 +102,7 @@ async function startBroadcast() {
 
       totalProcessed++;
 
-      // ⚡ 严格控频：每发送一条消息，强制延迟 40 毫秒（每秒最高 25 条，留出安全余量防封）
+      // ⚡ 严格控频：每秒最高 25 条
       await delay(40);
 
       // 每处理 20 条消息，给管理员更新一次界面进度
@@ -108,8 +114,9 @@ async function startBroadcast() {
     page++;
   }
 
-  // 4. 广播完成最终通知
+  // 广播完成最终通知
   await updateProgress(`🎉 **广播执行完毕！**\n\n📊 **统计结果：**\n- 成功送达: ${successCount} 人\n- 发送失败: ${failCount} 人\n- 累计处理: ${totalProcessed} 人`);
+  console.log("广播任务全部结束。");
 }
 
 startBroadcast();
