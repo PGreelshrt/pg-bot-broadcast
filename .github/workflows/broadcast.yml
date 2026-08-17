@@ -1,4 +1,4 @@
-name: Telegram Broadcast Engine
+name: Telegram Telegram Broadcast Engine
 
 on:
   repository_dispatch:
@@ -7,8 +7,6 @@ on:
 jobs:
   broadcast:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -26,7 +24,7 @@ jobs:
       - name: Run Broadcast Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}   # ✅ 修正为 service_role
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
         run: node broadcast.js
