@@ -15,7 +15,7 @@ async function sendReminder() {
   while (hasMore) {
     const { data: users, error } = await supabase
       .from('bot_users')
-      .select('chat_id, last_checkin, checkin_streak, is_blocked, status')
+      .select('chat_id, last_checkin, checkin_streak, is_blocked, status, lang')
       .eq('status', 'active')
       .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -30,24 +30,47 @@ async function sendReminder() {
 
     for (const user of users) {
       if (!user.chat_id || user.is_blocked === true || user.is_blocked === 'true') continue;
-
       if (!user.last_checkin) continue;
+
       const lastDate = new Date(user.last_checkin);
       const todayDate = new Date(todayStr);
       const daysDiff = Math.floor((todayDate - lastDate) / (24 * 60 * 60 * 1000));
 
-      // 🔥 Anti-spam: only notify on the first missed day (daysDiff === 2)
+      // Anti-spam: only notify on first missed day
       if (daysDiff === 2) {
         const currentStreak = user.checkin_streak || 0;
         const displayStreak = Math.max(0, currentStreak - 1);
 
-        const reminderText =
-          `🔔 **Check-in Reminder**\n\n` +
-          `Dear user, you missed your check-in yesterday. 🤷‍♀️\n\n` +
-          `⚠️ Your streak has been reduced by 1 day. Current streak: *${displayStreak}* day(s).\n\n` +
-          `🚀 Please check in today to stop further deduction and continue toward the 7-day reward! 👇\n\n` +
-          `/check\n\n` +
-          `*Note: Ignore this message if you have already checked in today.*`;
+        const lang = user.lang || 'en';
+        let reminderText = '';
+
+        if (lang === 'am') {
+          reminderText =
+            `🔔 የ check in ማስታወሻ
+
+ውድ ተጠቃሚ፣ ትናንት check in አምልጦዎታል:: 🤷‍♀️
+
+⚠️ የእለት ተእለት ተከታታይ ቀናትዎ በ1 ቀን ቀንሷል። አሁን ያሉበት ተከታታይ ቀናት፦ ${displayStreak} ቀን(ናት)::
+
+🚀 ተጨማሪ ቅናሽን ለማስቆም እና ወደ 7 ቀናት ሽልማት ለመቀጠል እባክዎ ዛሬ check_in ያድርጉ! 👇
+
+/check
+
+ማሳሰቢያ፡ ዛሬ አስቀድመው check_in ካደረጉ ይህንን መልዕክት ችላ ይበሉት።`;
+        } else {
+          reminderText =
+            `🔔 **Check-in Reminder**
+
+Dear user, you missed your check-in yesterday. 🤷‍♀️
+
+⚠️ Your streak has been reduced by 1 day. Current streak: *${displayStreak}* day(s).
+
+🚀 Please check in today to stop further deduction and continue toward the 7-day reward! 👇
+
+/check
+
+*Note: Ignore this message if you have already checked in today.*`;
+        }
 
         try {
           const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
@@ -60,7 +83,7 @@ async function sendReminder() {
             })
           });
           if (res.ok) {
-            console.log(`✅ Reminder sent to ${user.chat_id}`);
+            console.log(`✅ ${lang === 'am' ? 'Amharic' : 'English'} reminder sent to ${user.chat_id}`);
           } else {
             console.warn(`❌ Failed to send to ${user.chat_id}: ${await res.text()}`);
           }
