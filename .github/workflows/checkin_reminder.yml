@@ -2,8 +2,8 @@ name: Check-in Reminder Engine
 
 on:
   schedule:
-    - cron: '0 4 * * *'  # 每天 UTC 4:00（北京时间 12:00）
-  workflow_dispatch:     # 支持手动触发
+    - cron: '0 4 * * *'  
+  workflow_dispatch:    
 
 jobs:
   remind:
@@ -25,6 +25,6 @@ jobs:
       - name: Run Reminder Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}  # 确保 secret 存在，且为 service_role
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}  
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: node reminder.js
