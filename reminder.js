@@ -36,40 +36,30 @@ async function sendReminder() {
       const todayDate = new Date(todayStr);
       const daysDiff = Math.floor((todayDate - lastDate) / (24 * 60 * 60 * 1000));
 
-      // Anti-spam: only notify on first missed day
+      // Anti-spam: only notify on first missed day (daysDiff === 2)
       if (daysDiff === 2) {
         const currentStreak = user.checkin_streak || 0;
         const displayStreak = Math.max(0, currentStreak - 1);
 
-        const lang = user.lang || 'en';
+        const lang = (user.lang || 'en').toLowerCase();
         let reminderText = '';
 
         if (lang === 'am') {
           reminderText =
-            `🔔 የ check in ማስታወሻ
-
-ውድ ተጠቃሚ፣ ትናንት check in አምልጦዎታል:: 🤷‍♀️
-
-⚠️ የእለት ተእለት ተከታታይ ቀናትዎ በ1 ቀን ቀንሷል። አሁን ያሉበት ተከታታይ ቀናት፦ ${displayStreak} ቀን(ናት)::
-
-🚀 ተጨማሪ ቅናሽን ለማስቆም እና ወደ 7 ቀናት ሽልማት ለመቀጠል እባክዎ ዛሬ check_in ያድርጉ! 👇
-
-/check
-
-ማሳሰቢያ፡ ዛሬ አስቀድመው check_in ካደረጉ ይህንን መልዕክት ችላ ይበሉት።`;
+            `🔔 **የ check in ማስታወሻ**\n\n` +
+            `ውድ ተጠቃሚ፣ ትናንት check in አምልጦዎታል:: 🤷‍♀️\n\n` +
+            `⚠️ የእለት ተእለት ተከታታይ ቀናትዎ በ1 ቀን ቀንሷል። አሁን ያሉበት ተከታታይ ቀናት፦ *${displayStreak}* ቀን(ናት)::\n\n` +
+            `🚀 ተጨማሪ ቅናሽን ለማስቆም እና ወደ 7 ቀናት ሽልማት ለመቀጠል እባክዎ ዛሬ check_in ያድርጉ! 👇\n\n` +
+            `/check\n\n` +
+            `*ማሳሰቢያ፦ ዛሬ አስቀድመው check_in ካደረጉ ይህንን መልዕክት ችላ ይበሉት።*`;
         } else {
           reminderText =
-            `🔔 **Check-in Reminder**
-
-Dear user, you missed your check-in yesterday. 🤷‍♀️
-
-⚠️ Your streak has been reduced by 1 day. Current streak: *${displayStreak}* day(s).
-
-🚀 Please check in today to stop further deduction and continue toward the 7-day reward! 👇
-
-/check
-
-*Note: Ignore this message if you have already checked in today.*`;
+            `🔔 **Check-in Reminder**\n\n` +
+            `Dear user, you missed your check-in yesterday. 🤷‍♀️\n\n` +
+            `⚠️ Your streak has been reduced by 1 day. Current streak: *${displayStreak}* day(s).\n\n` +
+            `🚀 Please check in today to stop further deduction and continue toward the 7-day reward! 👇\n\n` +
+            `/check\n\n` +
+            `*Note: Ignore this message if you have already checked in today.*`;
         }
 
         try {
