@@ -1,0 +1,30 @@
+name: Check-in Reminder Engine
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 每天 UTC 4:00（北京时间 12:00）
+  workflow_dispatch:     # 支持手动触发
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Dependencies
+        run: |
+          npm init -y
+          npm install @supabase/supabase-js
+
+      - name: Run Reminder Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}  # 确保 secret 存在，且为 service_role
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: node reminder.js
